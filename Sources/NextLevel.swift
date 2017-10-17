@@ -1312,7 +1312,9 @@ extension NextLevel {
                 
                 if let output = self._photoOutput {
                     if self.photoConfiguration.flashMode != newValue.avfoundationType {
-                        let modes = output.supportedFlashModes
+                        // iOS 11 GM fix
+                        // https://forums.developer.apple.com/thread/86810
+                        let modes = output.__supportedFlashModes
                         let numberMode = NSNumber(integerLiteral: Int(newValue.avfoundationType.rawValue))
                         if modes.contains(numberMode) {
                             self.photoConfiguration.flashMode = newValue.avfoundationType
