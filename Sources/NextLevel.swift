@@ -646,6 +646,7 @@ extension NextLevel {
         // Note: use nextLevelSessionDidStart to ensure a device and session are available for configuration or format changes
         self.executeClosureAsyncOnSessionQueueIfNecessary {
             // setup AV capture sesssion
+            //创建Capture Session
             self._captureSession = AVCaptureSession()
             self._sessionConfigurationCount = 0
             
@@ -656,9 +657,11 @@ extension NextLevel {
                 session.automaticallyConfiguresApplicationAudioSession = self.automaticallyConfiguresApplicationAudioSession
                 
                 self.beginConfiguration()
+                //对previewLayer的session赋值
                 self.previewLayer.session = session
-                
+                //根据当前的模式，对AvCaptureOutputData进行初始化
                 self.configureSession()
+                // 根据模式，对AVCaputureInputs 进行初始化
                 self.configureSessionDevices()
                 self.configureMetadataObjects()
                 self.updateVideoOrientation()
@@ -745,7 +748,9 @@ extension NextLevel {
             session.commitConfiguration()
         }
     }
-    
+
+    ///
+    /// 根据模式来配置AVCaputure inputs， 只有两种，一种是音频、一种是视频
     internal func configureSessionDevices() {
         guard let _ = self._captureSession else {
             return
@@ -776,12 +781,13 @@ extension NextLevel {
             shouldConfigureVideo = true
             break
         }
-        
+        //如果需要捕获视频
         if shouldConfigureVideo == true {
             var captureDevice: AVCaptureDevice? = nil
             
             if let requestedDevice = self._requestedDevice {
                 captureDevice = requestedDevice
+                //有个扩展，来选择主要的视频捕获来源
             } else if let videoDevice = AVCaptureDevice.primaryVideoDevice(forPosition: self.devicePosition) {
                 captureDevice = videoDevice
             }
@@ -836,7 +842,7 @@ extension NextLevel {
         guard let session = self._captureSession else {
             return
         }
-        //开始进行摄像机 配置
+        //开始进行摄像机 配置,这里锁住session.beginConfiguration的调用
         self.beginConfiguration()
         
         // setup preset and mode

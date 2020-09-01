@@ -117,16 +117,21 @@ extension AVCaptureDevice {
     /// - Parameter position: Desired position of the device
     /// - Returns: Primary video capture device found, otherwise nil
     public class func primaryVideoDevice(forPosition position: AVCaptureDevice.Position) -> AVCaptureDevice? {
+        //wideAngle Camera是通用的
         var deviceTypes: [AVCaptureDevice.DeviceType] = [AVCaptureDevice.DeviceType.builtInWideAngleCamera]
         if #available(iOS 11.0, *) {
+            //如果是IOS11以上， 增加 DualCamera
             deviceTypes.append(.builtInDualCamera)
         } else {
+            //否则的话增加DuoCamera
             deviceTypes.append(.builtInDuoCamera)
         }
         
         // prioritize duo camera systems before wide angle
+        //搜寻合适的设备
         let discoverySession = AVCaptureDevice.DiscoverySession(deviceTypes: deviceTypes, mediaType: AVMediaType.video, position: position)
         for device in discoverySession.devices {
+            //如果是11以上，如果有dualCamera
             if #available(iOS 11.0, *) {
                 if (device.deviceType == AVCaptureDevice.DeviceType.builtInDualCamera) {
                     return device
@@ -137,6 +142,7 @@ extension AVCaptureDevice {
                 }
             }
         }
+        //以上都找不到的话，则返回第一个
         return discoverySession.devices.first
     }
     
