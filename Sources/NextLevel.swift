@@ -944,6 +944,7 @@ extension NextLevel {
     private func configureDevice(captureDevice: AVCaptureDevice, mediaType: AVMediaType) {
         
         if let session = self._captureSession,
+           // device input 可以只通过session  和 type 来查询，不需要保留当前的inputDevice
             let currentDeviceInput = AVCaptureDeviceInput.deviceInput(withMediaType: mediaType, captureSession: session) {
             if currentDeviceInput.device == captureDevice {
                 return
@@ -995,6 +996,7 @@ extension NextLevel {
     
     private func addInput(session: AVCaptureSession, device: AVCaptureDevice) -> Bool {
         do {
+            //初始化新的input
             let input = try AVCaptureDeviceInput(device: device)
             if session.canAddInput(input) {
                 session.addInput(input)
