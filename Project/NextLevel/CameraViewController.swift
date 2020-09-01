@@ -242,6 +242,7 @@ extension CameraViewController {
         let predicate = NSPredicate(format: "localizedTitle = %@", title)
         let options = PHFetchOptions()
         options.predicate = predicate
+        //这里返回Collections（相册列表）
         let result = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: options)
         if result.count > 0 {
             return result.firstObject
@@ -342,16 +343,23 @@ extension CameraViewController {
     
     internal func saveVideo(withURL url: URL) {
         PHPhotoLibrary.shared().performChanges({
+            //获取album Collection
             let albumAssetCollection = self.albumAssetCollection(withTitle: NextLevelAlbumTitle)
             if albumAssetCollection == nil {
+                //如果没有，则创建这个相册
                 let changeRequest = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: NextLevelAlbumTitle)
                 let _ = changeRequest.placeholderForCreatedAssetCollection
             }}, completionHandler: { (success1: Bool, error1: Error?) in
+                //获取相册已经结束
                 if let albumAssetCollection = self.albumAssetCollection(withTitle: NextLevelAlbumTitle) {
                     PHPhotoLibrary.shared().performChanges({
+                        //创建change request， 这个是Asset change Request
                         if let assetChangeRequest = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url) {
+                            // 这里是对collection 来change request
                             let assetCollectionChangeRequest = PHAssetCollectionChangeRequest(for: albumAssetCollection)
+                            // 创建资源(都要创建placeHolder)
                             let enumeration: NSArray = [assetChangeRequest.placeholderForCreatedAsset!]
+                            //保存资源
                             assetCollectionChangeRequest?.addAssets(enumeration)
                         }
                     }, completionHandler: { (success2: Bool, error2: Error?) in

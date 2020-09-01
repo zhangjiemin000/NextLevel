@@ -39,7 +39,7 @@ public enum NextLevelAuthorizationStatus: Int, CustomStringConvertible {
     case notDetermined = 0
     case notAuthorized
     case authorized
-    
+    //原来这个是放在了CustomStringConvertible
     public var description: String {
         get {
             switch self {
@@ -503,7 +503,9 @@ public class NextLevel: NSObject {
         
         if let session = self._captureSession {
             self.beginConfiguration()
+            //移除所有的Inputs
             self.removeInputs(session: session)
+            //移除所有的Outputs
             self.removeOutputs(session: session)
             self.commitConfiguration()
         }
@@ -524,7 +526,7 @@ public class NextLevel: NSObject {
 extension NextLevel {
     
     /// Checks the current authorization status for the desired media type.
-    ///
+    /// 输入的权限也需要获取
     /// - Parameter mediaType: Specified media type (i.e. AVMediaTypeVideo, AVMediaTypeAudio, etc.)
     /// - Returns: Authorization status for the desired media type.
     public static func authorizationStatus(forMediaType mediaType: AVMediaType) -> NextLevelAuthorizationStatus {
@@ -547,7 +549,7 @@ extension NextLevel {
     }
     
     /// Requests authorization permission.
-    ///
+    /// 统一申请MediaType的权限
     /// - Parameters:
     ///   - mediaType: Specified media type (i.e. AVMediaTypeVideo, AVMediaTypeAudio, etc.)
     ///   - completionHandler: A block called with the responding access request result
@@ -585,7 +587,7 @@ extension NextLevel {
 extension NextLevel {
     
     /// Starts the current recording session.
-    ///
+    /// 根据配置的模式，来设置对应的Session
     /// - Throws: 'NextLevelError.authorization' when permissions are not authorized, 'NextLevelError.started' when the session has already started.
     public func start() throws {
         guard self.authorizationStatusForCurrentCaptureMode() == .authorized else {
@@ -637,7 +639,9 @@ extension NextLevel {
         }
         #endif
     }
-    
+
+    ///
+    /// 设置AV session 如图片或者视频
     internal func setupAVSession() {
         // Note: use nextLevelSessionDidStart to ensure a device and session are available for configuration or format changes
         self.executeClosureAsyncOnSessionQueueIfNecessary {
@@ -832,7 +836,7 @@ extension NextLevel {
         guard let session = self._captureSession else {
             return
         }
-        
+        //开始进行摄像机 配置
         self.beginConfiguration()
         
         // setup preset and mode
@@ -843,6 +847,7 @@ extension NextLevel {
         case .video:
             fallthrough
         case .videoWithoutAudio:
+            //如果不是videoConfiguration,preset是不是就是代表
             if session.sessionPreset != self.videoConfiguration.preset {
                 if session.canSetSessionPreset(self.videoConfiguration.preset) {
                     session.sessionPreset = self.videoConfiguration.preset
@@ -850,7 +855,7 @@ extension NextLevel {
                     print("NextLevel, could not set preset on session")
                 }
             }
-            
+            //如果当前是video
             if self.captureMode == .video {
                 let _ = self.addAudioOuput()
             }
@@ -1017,35 +1022,46 @@ extension NextLevel {
     }
     
     // outputs, only call within configuration lock
-    
+    ///
+    /// 增加VideoOutput
+    /// - Returns:
     private func addVideoOutput() -> Bool {
         
         if self._videoOutput == nil {
+            //新建Video output
             self._videoOutput = AVCaptureVideoDataOutput()
             self._videoOutput?.alwaysDiscardsLateVideoFrames = false
-            
+            //主要是指定Video的格式，这里是BGRA
             var videoSettings = [String(kCVPixelBufferPixelFormatTypeKey):Int(kCVPixelFormatType_32BGRA)]
+            //查找支持的像素格式
             if let formatTypes = self._videoOutput?.availableVideoPixelFormatTypes {
                 var supportsFullRange = false
                 var supportsVideoRange = false
                 for format in formatTypes {
+                    //YUV 4：2：0 plan
                     if format == Int(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) {
                         supportsFullRange = true
                     }
+                    //YUV 4：2：0 plan 存储格式和full一样，但是他的值范围比Full的小
                     if format == Int(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange) {
                         supportsVideoRange = true
                     }
+
                 }
+                //如果支持full 格式
                 if supportsFullRange {
                     videoSettings[String(kCVPixelBufferPixelFormatTypeKey)] = Int(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)
                 } else if supportsVideoRange {
+                    //否则的话，就是video range， 颜色空间会小一些
                     videoSettings[String(kCVPixelBufferPixelFormatTypeKey)] = Int(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
                 }
             }
+            //主要指定这些格式
             self._videoOutput?.videoSettings = videoSettings
         }
         
         if let session = self._captureSession, let videoOutput = self._videoOutput {
+            //加入output
             if session.canAddOutput(videoOutput) {
                 session.addOutput(videoOutput)
                 videoOutput.setSampleBufferDelegate(self, queue: self._sessionQueue)
@@ -1194,7 +1210,10 @@ extension NextLevel {
         #endif
         self._metadataOutput = nil
     }
-    
+
+    ///
+    /// 删除不需要的outputs，比如当前模式为video，那么photo的输出就不需要了
+    /// - Parameter session:
     internal func removeUnusedOutputsForCurrentCameraMode(session: AVCaptureSession) {
         switch self.captureMode {
         case .video:
@@ -1363,9 +1382,12 @@ extension NextLevel {
             self.deviceDelegate?.nextLevel(self, didChangeDeviceOrientation: currentOrientation)
         }
     }
-    
+
+    ///
+    /// 更新OutputSettings
     internal func updateVideoOutputSettings() {
         if let videoOutput = self._videoOutput {
+            //建立Connection，connection 有些设置
             if let videoConnection = videoOutput.connection(with: AVMediaType.video) {
                 if videoConnection.isVideoStabilizationSupported {
                     videoConnection.preferredVideoStabilizationMode = self.videoStabilizationMode
@@ -3208,12 +3230,14 @@ extension NextLevel {
         }
         self._observers.removeAll()
     }
-    
+
+    ///
+    ///增加Ouput观察者
     internal func addCaptureOutputObservers() {
         guard let photoOutput = self._photoOutput else {
             return
         }
-        
+        // 这种写法值得参考 注册KVO
         self._captureOutputObservers.append(photoOutput.observe(\.isFlashScene, options: [.new]) { [weak self] (object, change) in
             guard let strongSelf = self else {
                 return

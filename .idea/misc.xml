@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SwiftPackageManagerSettings">
+    <option name="linkedExternalProjectsSettings">
+      <SwiftPackageManagerProjectSettings>
+        <option name="externalProjectPath" value="$PROJECT_DIR$/NextLevel.xcworkspace" />
+      </SwiftPackageManagerProjectSettings>
+    </option>
+  </component>
+</project>
