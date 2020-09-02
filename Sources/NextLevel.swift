@@ -2481,6 +2481,7 @@ extension NextLevel {
     }
     
     internal func beginRecordingNewClipIfNecessary() {
+        //获取RecordingSession，recordingSession中保存了Recording的一部分信息
         if let session = self._recordingSession,
             session.isReady == false {
             session.beginClip()
@@ -2546,7 +2547,7 @@ extension NextLevel {
     
     // sample buffer processing
     ///
-    /// 处理视频输出
+    /// 处理视频输出(处理视频的存储)
     /// - Parameters:
     ///   - sampleBuffer:
     ///   - session:
@@ -2564,8 +2565,9 @@ extension NextLevel {
         }
         
         if self._recording && (session.isAudioSetup || self.captureMode == .videoWithoutAudio) && session.currentClipHasStarted {
+            //判断状态，以新建存储的Video文件
             self.beginRecordingNewClipIfNecessary()
-            
+            //这是设定一个最小的间隔，250帧
             let minTimeBetweenFrames = 0.004
             let sleepDuration = minTimeBetweenFrames - (CACurrentMediaTime() - self._lastVideoFrameTimeInterval)
             if sleepDuration > 0 {
@@ -2573,10 +2575,12 @@ extension NextLevel {
             }
             
             // check with the client to setup/maintain external render contexts
+            //如果需要renderBuffer（如果需要做一些渲染）
             let imageBuffer = self.isVideoCustomContextRenderingEnabled == true ? CMSampleBufferGetImageBuffer(sampleBuffer) : nil
             if let imageBuffer = imageBuffer {
                 if CVPixelBufferLockBaseAddress(imageBuffer, CVPixelBufferLockFlags(rawValue: 0)) == kCVReturnSuccess {
                     // only called from captureQueue
+                    //传出去
                     self.videoDelegate?.nextLevel(self, renderToCustomContextWithImageBuffer: imageBuffer, onQueue: self._sessionQueue)
                 } else {
                     self._sessionVideoCustomContextImageBuffer = nil
@@ -2588,6 +2592,7 @@ extension NextLevel {
             }
             
             // when clients modify a frame using their rendering context, the resulting CVPixelBuffer is then passed in here with the original sampleBuffer for recording
+            //当用户使用了自己渲染的图片，这里的self._sessionVideoCustomContextImageBuffer需要存储用户传回的结果
             session.appendVideo(withSampleBuffer: sampleBuffer, customImageBuffer: self._sessionVideoCustomContextImageBuffer, minFrameDuration: device.activeVideoMinFrameDuration, completionHandler: { (success: Bool) -> Void in
                 // cleanup client rendering context
                 if self.isVideoCustomContextRenderingEnabled {
@@ -2693,9 +2698,14 @@ extension NextLevel {
             }
         }
     }
-    
+    ///
+    /// 处理音频输出
+    /// - Parameters:
+    ///   - sampleBuffer:
+    ///   - session:
     internal func handleAudioOutput(sampleBuffer: CMSampleBuffer, session: NextLevelSession) {
         if session.isAudioSetup == false {
+            //使用SampleBuffer来获取对应的settings
             if let settings = self.audioConfiguration.avcaptureSettingsDictionary(sampleBuffer: sampleBuffer),
                 let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer) {
                 if !session.setupAudio(withSettings: settings, configuration: self.audioConfiguration, formatDescription: formatDescription) {

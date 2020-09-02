@@ -82,7 +82,10 @@ extension NextLevel {
                  kCGImagePropertyTIFFArtist as String : NextLevelMetadataArtist,
                  kCGImagePropertyTIFFDateTime as String : Date().iso8601() ]
     }
-    
+
+    ///
+    /// 生成MetaData
+    /// - Returns:
     internal class func assetWriterMetadata() -> [AVMutableMetadataItem] {
         let currentDevice = UIDevice.current
         

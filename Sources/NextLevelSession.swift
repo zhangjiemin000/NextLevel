@@ -292,13 +292,14 @@ extension NextLevelSession {
     }
 
     /// Prepares a session for recording audio.
-    ///
+    /// 设置存储Audio的配置
     /// - Parameters:
     ///   - settings: AVFoundation audio settings dictionary
     ///   - configuration: Audio configuration for audio output
     ///   - formatDescription: sample buffer format description
     /// - Returns: True when setup completes successfully
     public func setupAudio(withSettings settings: [String: Any]?, configuration: NextLevelAudioConfiguration, formatDescription: CMFormatDescription) -> Bool {
+        //初始化audioInput
         self._audioInput = AVAssetWriterInput(mediaType: AVMediaType.audio, outputSettings: settings, sourceFormatHint: formatDescription)
         if let audioInput = self._audioInput {
             audioInput.expectsMediaDataInRealTime = true
@@ -307,17 +308,22 @@ extension NextLevelSession {
         return self.isAudioSetup
     }
 
+    ///
+    /// 创建Writer
+    /// 需要输入VideoInput、AudioInput， 不需要Output，初始化Writer时，自动链接了文件目录
     internal func setupWriter() {
         guard let url = self.nextFileURL() else {
             return
         }
 
         do {
+            //初始化AssetWriter
             self._writer = try AVAssetWriter(url: url, fileType: self.fileType)
             if let writer = self._writer {
                 writer.shouldOptimizeForNetworkUse = true
+                //生成metadata
                 writer.metadata = NextLevel.assetWriterMetadata()
-
+                //writer 也要加入videoInput
                 if let videoInput = self._videoInput {
                     if writer.canAdd(videoInput) {
                         writer.add(videoInput)
@@ -532,7 +538,9 @@ extension NextLevelSession {
     /// Starts a clip
     public func beginClip() {
         self.executeClosureSyncOnSessionQueueIfNecessary {
+            //如果写入文件对象为空
             if self._writer == nil {
+                //初始化AssetWriter，AssetWriter的Input
                 self.setupWriter()
                 self._currentClipDuration = CMTime.zero
                 self._currentClipHasAudio = false
@@ -842,8 +850,14 @@ extension NextLevelSession {
 
 extension NextLevelSession {
 
+    ///
+    /// 自动生成下一个文件路径
+    /// - Returns:
     internal func nextFileURL() -> URL? {
+        //生成下一个视频文件的地址
         let filename = "\(self.identifier.uuidString)-NL-clip.\(self._clipFilenameCount).\(self.fileExtension)"
+        //这里的outputDirectory是一个临时文件夹
+        //拼接URL
         if let url = NextLevelClip.clipURL(withFilename: filename, directoryPath: self.outputDirectory) {
             self.removeFile(fileUrl: url)
             self._clipFilenameCount += 1
