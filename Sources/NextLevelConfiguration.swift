@@ -232,7 +232,7 @@ public class NextLevelVideoConfiguration: NextLevelConfiguration {
     // MARK: - func
     
     /// Provides an AVFoundation friendly dictionary for configuring output.
-    ///提供友好的一个dictionary
+    ///提供友好的一个dictionary，这个是为了写入视频文件获取的设置
     /// - Parameter sampleBuffer: Sample buffer for extracting configuration information
     /// - Returns: Video configuration dictionary for AVFoundation
     public override func avcaptureSettingsDictionary(sampleBuffer: CMSampleBuffer? = nil, pixelBuffer: CVPixelBuffer? = nil) -> [String : Any]? {
