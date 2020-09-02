@@ -30,30 +30,30 @@ import AVFoundation
 
 /// NextLevelSession, a powerful object for managing and editing a set of recorded media clips.
 public class NextLevelSession {
-    
+
     /// Output directory for a session.
     public var outputDirectory: String
-    
+
     /// Output file type for a session, see AVMediaFormat.h for supported types.
     public var fileType: AVFileType = .mp4
-    
+
     /// Output file extension for a session, see AVMediaFormat.h for supported extensions.
     public var fileExtension: String = "mp4"
-    
+
     /// Unique identifier for a session.
     public var identifier: UUID {
         get {
             return self._identifier
         }
     }
-    
+
     /// Creation date for a session.
     public var date: Date {
         get {
             return self._date
         }
     }
-    
+
     /// Creates a URL for session output, otherwise nil
     public var url: URL? {
         get {
@@ -65,7 +65,7 @@ public class NextLevelSession {
             }
         }
     }
-    
+
     public var isVideoSetup: Bool {
         get {
             return self._videoInput != nil
@@ -78,13 +78,13 @@ public class NextLevelSession {
             return self._videoInput?.isReadyForMoreMediaData ?? false
         }
     }
-    
+
     public var isAudioSetup: Bool {
         get {
             return self._audioInput != nil
         }
     }
-    
+
     /// Checks if the session is setup for recording audio
     public var isAudioReady: Bool {
         get {
@@ -112,14 +112,14 @@ public class NextLevelSession {
             return self._writer != nil
         }
     }
-    
+
     /// True if the current clip recording has been started.
     public var currentClipHasStarted: Bool {
         get {
             return self._currentClipHasStarted
         }
     }
-    
+
     /// Duration of the current clip.
     public var currentClipDuration: CMTime {
         get {
@@ -140,7 +140,7 @@ public class NextLevelSession {
             return self._currentClipHasAudio
         }
     }
-    
+
     /// `AVAsset` of the session.
     public var asset: AVAsset? {
         get {
@@ -157,35 +157,36 @@ public class NextLevelSession {
             return asset
         }
     }
-    
+
     /// Shared pool where by which all media is allocated.
     public var pixelBufferPool: CVPixelBufferPool? {
         get {
             return self._pixelBufferAdapter?.pixelBufferPool
         }
     }
-    
+
     // MARK: - private instance vars
-    
+
     internal var _identifier: UUID
     internal var _date: Date
-    
+
     internal var _totalDuration: CMTime = .zero
     internal var _clips: [NextLevelClip] = []
     internal var _clipFilenameCount: Int = 0
 
     internal var _writer: AVAssetWriter?
+    ///video input 是对资源的写入对象
     internal var _videoInput: AVAssetWriterInput?
     internal var _audioInput: AVAssetWriterInput?
     internal var _pixelBufferAdapter: AVAssetWriterInputPixelBufferAdaptor?
 
     internal var _videoConfiguration: NextLevelVideoConfiguration?
     internal var _audioConfiguration: NextLevelAudioConfiguration?
-    
+
     internal var _audioQueue: DispatchQueue
     internal var _sessionQueue: DispatchQueue
     internal var _sessionQueueKey: DispatchSpecificKey<()>
-    
+
     internal var _currentClipDuration: CMTime = .zero
     internal var _currentClipHasAudio: Bool = false
     internal var _currentClipHasVideo: Bool = false
@@ -195,15 +196,15 @@ public class NextLevelSession {
     internal var _startTimestamp: CMTime = CMTime.invalid
     internal var _lastAudioTimestamp: CMTime = CMTime.invalid
     internal var _lastVideoTimestamp: CMTime = CMTime.invalid
-    
-    internal var _skippedAudioBuffers:[CMSampleBuffer] = []
-    
+
+    internal var _skippedAudioBuffers: [CMSampleBuffer] = []
+
     private let NextLevelSessionAudioQueueIdentifier = "engineering.NextLevel.session.audioQueue"
     private let NextLevelSessionQueueIdentifier = "engineering.NextLevel.sessionQueue"
     private let NextLevelSessionSpecificKey = DispatchSpecificKey<()>()
-    
+
     // MARK: - object lifecycle
-    
+
     /// Initialize using a specific dispatch queue.
     ///
     /// - Parameters:
@@ -214,13 +215,13 @@ public class NextLevelSession {
         self._sessionQueue = queue
         self._sessionQueueKey = queueKey
     }
-    
+
     /// Initializer.
     public init() {
         self._identifier = UUID()
         self._date = Date()
         self.outputDirectory = NSTemporaryDirectory()
-     
+
         self._audioQueue = DispatchQueue(label: NextLevelSessionAudioQueueIdentifier)
 
         // should always use init(queue:queueKey:), but this may be good for the future
@@ -228,37 +229,38 @@ public class NextLevelSession {
         self._sessionQueue.setSpecific(key: NextLevelSessionSpecificKey, value: ())
         self._sessionQueueKey = NextLevelSessionSpecificKey
     }
-    
+
     deinit {
         self._writer = nil
         self._videoInput = nil
         self._audioInput = nil
         self._pixelBufferAdapter = nil
-        
+
         self._videoConfiguration = nil
         self._audioConfiguration = nil
     }
-    
+
 }
 
 // MARK: - setup
 
 extension NextLevelSession {
-    
+
     /// Prepares a session for recording video.
-    ///
+    /// 设置一些Video的写入配置
     /// - Parameters:
     ///   - settings: AVFoundation video settings dictionary
     ///   - configuration: Video configuration for video output
     ///   - formatDescription: sample buffer format description
     /// - Returns: True when setup completes successfully
-    public func setupVideo(withSettings settings: [String : Any]?, configuration: NextLevelVideoConfiguration, formatDescription: CMFormatDescription? = nil) -> Bool {
+    public func setupVideo(withSettings settings: [String: Any]?, configuration: NextLevelVideoConfiguration, formatDescription: CMFormatDescription? = nil) -> Bool {
         if let formatDescription = formatDescription {
             self._videoInput = AVAssetWriterInput(mediaType: AVMediaType.video, outputSettings: settings, sourceFormatHint: formatDescription)
         } else {
             if let _ = settings?[AVVideoCodecKey],
-                let _ = settings?[AVVideoWidthKey],
-                let _ = settings?[AVVideoHeightKey] {
+               let _ = settings?[AVVideoWidthKey],
+               let _ = settings?[AVVideoHeightKey] {
+                //初始化资源写入
                 self._videoInput = AVAssetWriterInput(mediaType: AVMediaType.video, outputSettings: settings)
             } else {
                 print("NextLevelSession, configuration failure for video output")
@@ -266,14 +268,14 @@ extension NextLevelSession {
                 return false
             }
         }
-        
+        //如果存在Video写入的情况
         if let videoInput = self._videoInput {
             videoInput.expectsMediaDataInRealTime = true
             videoInput.transform = configuration.transform
             self._videoConfiguration = configuration
-            
-            var pixelBufferAttri: [String : Any] = [String(kCVPixelBufferPixelFormatTypeKey): Int(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)]
-            
+
+            var pixelBufferAttri: [String: Any] = [String(kCVPixelBufferPixelFormatTypeKey): Int(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)]
+
             if let formatDescription = formatDescription {
                 let videoDimensions = CMVideoFormatDescriptionGetDimensions(formatDescription)
                 pixelBufferAttri[String(kCVPixelBufferWidthKey)] = Float(videoDimensions.width)
@@ -283,12 +285,12 @@ extension NextLevelSession {
                 pixelBufferAttri[String(kCVPixelBufferWidthKey)] = width
                 pixelBufferAttri[String(kCVPixelBufferHeightKey)] = height
             }
-            
+            //这个是写入视频的适配器?
             self._pixelBufferAdapter = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: videoInput, sourcePixelBufferAttributes: pixelBufferAttri)
         }
         return self.isVideoSetup
     }
-    
+
     /// Prepares a session for recording audio.
     ///
     /// - Parameters:
@@ -296,7 +298,7 @@ extension NextLevelSession {
     ///   - configuration: Audio configuration for audio output
     ///   - formatDescription: sample buffer format description
     /// - Returns: True when setup completes successfully
-    public func setupAudio(withSettings settings: [String : Any]?, configuration: NextLevelAudioConfiguration, formatDescription: CMFormatDescription) -> Bool {
+    public func setupAudio(withSettings settings: [String: Any]?, configuration: NextLevelAudioConfiguration, formatDescription: CMFormatDescription) -> Bool {
         self._audioInput = AVAssetWriterInput(mediaType: AVMediaType.audio, outputSettings: settings, sourceFormatHint: formatDescription)
         if let audioInput = self._audioInput {
             audioInput.expectsMediaDataInRealTime = true
@@ -304,18 +306,18 @@ extension NextLevelSession {
         }
         return self.isAudioSetup
     }
-    
+
     internal func setupWriter() {
         guard let url = self.nextFileURL() else {
             return
         }
-        
+
         do {
             self._writer = try AVAssetWriter(url: url, fileType: self.fileType)
             if let writer = self._writer {
                 writer.shouldOptimizeForNetworkUse = true
                 writer.metadata = NextLevel.assetWriterMetadata()
-                
+
                 if let videoInput = self._videoInput {
                     if writer.canAdd(videoInput) {
                         writer.add(videoInput)
@@ -323,7 +325,7 @@ extension NextLevelSession {
                         print("NextLevel, could not add video input to session")
                     }
                 }
-                
+
                 if let audioInput = self._audioInput {
                     if writer.canAdd(audioInput) {
                         writer.add(audioInput)
@@ -331,7 +333,7 @@ extension NextLevelSession {
                         print("NextLevel, could not add audio input to session")
                     }
                 }
-                
+
                 if writer.startWriting() {
                     self._timeOffset = CMTime.zero
                     self._startTimestamp = CMTime.invalid
@@ -345,7 +347,7 @@ extension NextLevelSession {
             print("NextLevel could not create asset writer")
         }
     }
-    
+
     internal func destroyWriter() {
         self._writer = nil
         self._currentClipHasStarted = false
@@ -360,10 +362,10 @@ extension NextLevelSession {
 // MARK: - recording
 
 extension NextLevelSession {
-    
+
     /// Completion handler type for appending a sample buffer
     public typealias NextLevelSessionAppendSampleBufferCompletionHandler = (_: Bool) -> Void
-    
+
     /// Append video sample buffer frames to a session for recording.
     ///
     /// - Parameters:
@@ -374,32 +376,32 @@ extension NextLevelSession {
     public func appendVideo(withSampleBuffer sampleBuffer: CMSampleBuffer, customImageBuffer: CVPixelBuffer?, minFrameDuration: CMTime, completionHandler: NextLevelSessionAppendSampleBufferCompletionHandler) {
         let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         self.startSessionIfNecessary(timestamp: timestamp)
-        
+
         var frameDuration = minFrameDuration
         let offsetBufferTimestamp = CMTimeSubtract(timestamp, self._timeOffset)
-        
+
         if let timeScale = self._videoConfiguration?.timescale,
-            timeScale != 1.0 {
+           timeScale != 1.0 {
             let scaledDuration = CMTimeMultiplyByFloat64(minFrameDuration, multiplier: timeScale)
             if self._currentClipDuration.value > 0 {
                 self._timeOffset = CMTimeAdd(self._timeOffset, CMTimeSubtract(minFrameDuration, scaledDuration))
             }
             frameDuration = scaledDuration
         }
-        
+
         if let videoInput = self._videoInput,
-            let pixelBufferAdapter = self._pixelBufferAdapter,
-            videoInput.isReadyForMoreMediaData {
-                
+           let pixelBufferAdapter = self._pixelBufferAdapter,
+           videoInput.isReadyForMoreMediaData {
+
             var bufferToProcess: CVPixelBuffer? = nil
             if let customImageBuffer = customImageBuffer {
                 bufferToProcess = customImageBuffer
             } else {
                 bufferToProcess = CMSampleBufferGetImageBuffer(sampleBuffer)
             }
-            
+
             if let bufferToProcess = bufferToProcess,
-                pixelBufferAdapter.append(bufferToProcess, withPresentationTime: offsetBufferTimestamp) {
+               pixelBufferAdapter.append(bufferToProcess, withPresentationTime: offsetBufferTimestamp) {
                 self._currentClipDuration = CMTimeSubtract(CMTimeAdd(offsetBufferTimestamp, frameDuration), self._startTimestamp)
                 self._lastVideoTimestamp = timestamp
                 self._currentClipHasVideo = true
@@ -409,9 +411,9 @@ extension NextLevelSession {
         }
         completionHandler(false)
     }
-    
+
     // Beta: appendVideo(withPixelBuffer:customImageBuffer:timestamp:minFrameDuration:completionHandler:) needs to be tested
-    
+
     /// Append video pixel buffer frames to a session for recording.
     ///
     /// - Parameters:
@@ -422,32 +424,32 @@ extension NextLevelSession {
     public func appendVideo(withPixelBuffer pixelBuffer: CVPixelBuffer, customImageBuffer: CVPixelBuffer?, timestamp: TimeInterval, minFrameDuration: CMTime, completionHandler: NextLevelSessionAppendSampleBufferCompletionHandler) {
         let timestamp = CMTime(seconds: timestamp, preferredTimescale: minFrameDuration.timescale)
         self.startSessionIfNecessary(timestamp: timestamp)
-        
+
         var frameDuration = minFrameDuration
         let offsetBufferTimestamp = CMTimeSubtract(timestamp, self._timeOffset)
-        
+
         if let timeScale = self._videoConfiguration?.timescale,
-            timeScale != 1.0 {
+           timeScale != 1.0 {
             let scaledDuration = CMTimeMultiplyByFloat64(minFrameDuration, multiplier: timeScale)
             if self._currentClipDuration.value > 0 {
                 self._timeOffset = CMTimeAdd(self._timeOffset, CMTimeSubtract(minFrameDuration, scaledDuration))
             }
             frameDuration = scaledDuration
         }
-        
+
         if let videoInput = self._videoInput,
-            let pixelBufferAdapter = self._pixelBufferAdapter,
-            videoInput.isReadyForMoreMediaData {
-            
+           let pixelBufferAdapter = self._pixelBufferAdapter,
+           videoInput.isReadyForMoreMediaData {
+
             var bufferToProcess: CVPixelBuffer? = nil
             if let customImageBuffer = customImageBuffer {
                 bufferToProcess = customImageBuffer
             } else {
                 bufferToProcess = pixelBuffer
             }
-            
+
             if let bufferToProcess = bufferToProcess,
-                pixelBufferAdapter.append(bufferToProcess, withPresentationTime: offsetBufferTimestamp) {
+               pixelBufferAdapter.append(bufferToProcess, withPresentationTime: offsetBufferTimestamp) {
                 self._currentClipDuration = CMTimeSubtract(CMTimeAdd(offsetBufferTimestamp, frameDuration), self._startTimestamp)
                 self._lastVideoTimestamp = timestamp
                 self._currentClipHasVideo = true
@@ -457,7 +459,7 @@ extension NextLevelSession {
         }
         completionHandler(false)
     }
-    
+
     /// Append audio sample buffer to a session for recording.
     ///
     /// - Parameters:
@@ -466,42 +468,42 @@ extension NextLevelSession {
     public func appendAudio(withSampleBuffer sampleBuffer: CMSampleBuffer, completionHandler: @escaping NextLevelSessionAppendSampleBufferCompletionHandler) {
         self.startSessionIfNecessary(timestamp: CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
         self._audioQueue.async {
-            
+
             var hasFailed = false
-            
+
             let buffers = self._skippedAudioBuffers + [sampleBuffer]
             self._skippedAudioBuffers = []
             var failedBuffers: [CMSampleBuffer] = []
-            
+
             buffers.forEach { buffer in
                 let duration = CMSampleBufferGetDuration(buffer)
                 if let adjustedBuffer = CMSampleBuffer.createSampleBuffer(fromSampleBuffer: buffer, withTimeOffset: self._timeOffset, duration: duration) {
                     let presentationTimestamp = CMSampleBufferGetPresentationTimeStamp(adjustedBuffer)
                     let lastTimestamp = CMTimeAdd(presentationTimestamp, duration)
-                    
+
                     if let audioInput = self._audioInput,
-                        audioInput.isReadyForMoreMediaData,
-                        audioInput.append(adjustedBuffer) {
+                       audioInput.isReadyForMoreMediaData,
+                       audioInput.append(adjustedBuffer) {
                         self._lastAudioTimestamp = lastTimestamp
-                        
+
                         if !self.currentClipHasVideo {
                             self._currentClipDuration = CMTimeSubtract(lastTimestamp, self._startTimestamp)
                         }
-                        
+
                         self._currentClipHasAudio = true
-                        
+
                     } else {
                         failedBuffers.append(buffer)
                         hasFailed = true
                     }
                 }
             }
-            
+
             self._skippedAudioBuffers = failedBuffers
             completionHandler(!hasFailed)
         }
     }
-    
+
     /// Resets a session to the initial state.
     public func reset() {
         self.executeClosureSyncOnSessionQueueIfNecessary {
@@ -514,19 +516,19 @@ extension NextLevelSession {
             self._audioConfiguration = nil
         }
     }
-    
+
     private func startSessionIfNecessary(timestamp: CMTime) {
         if !self._startTimestamp.isValid {
             self._startTimestamp = timestamp
             self._writer?.startSession(atSourceTime: timestamp)
         }
     }
-    
+
     // create
-    
+
     /// Completion handler type for ending a clip
     public typealias NextLevelSessionEndClipCompletionHandler = (_: NextLevelClip?, _: Error?) -> Void
-    
+
     /// Starts a clip
     public func beginClip() {
         self.executeClosureSyncOnSessionQueueIfNecessary {
@@ -540,7 +542,7 @@ extension NextLevelSession {
             }
         }
     }
-    
+
     /// Finalizes the recording of a clip.
     ///
     /// - Parameter completionHandler: Handler for when a clip is finalized or finalization fails
@@ -549,11 +551,11 @@ extension NextLevelSession {
             self._audioQueue.sync {
                 if self._currentClipHasStarted {
                     self._currentClipHasStarted = false
-                    
+
                     if let writer = self._writer {
                         if !self.currentClipHasAudio && !self.currentClipHasVideo {
                             writer.cancelWriting()
-                            
+
                             self.removeFile(fileUrl: writer.outputURL)
                             self.destroyWriter()
 
@@ -570,16 +572,16 @@ extension NextLevelSession {
                                     var clip: NextLevelClip? = nil
                                     let url = writer.outputURL
                                     let error = writer.error
-                                    
+
                                     if error == nil {
                                         clip = NextLevelClip(url: url, infoDict: nil)
                                         if let clip = clip {
                                             self.add(clip: clip)
                                         }
                                     }
-                                    
+
                                     self.destroyWriter()
-                                    
+
                                     if let completionHandler = completionHandler {
                                         DispatchQueue.main.async {
                                             completionHandler(clip, error)
@@ -591,7 +593,7 @@ extension NextLevelSession {
                         }
                     }
                 }
-                
+
                 if let completionHandler = completionHandler {
                     DispatchQueue.main.async {
                         completionHandler(nil, NextLevelError.notReadyToRecord)
@@ -605,7 +607,7 @@ extension NextLevelSession {
 // MARK: - clip editing
 
 extension NextLevelSession {
-    
+
     /// Helper function that provides the location of the last recorded clip.
     /// This is helpful when merging multiple segments isn't desired.
     ///
@@ -614,14 +616,14 @@ extension NextLevelSession {
         get {
             var lastClipUrl: URL? = nil
             if !self._clips.isEmpty,
-                let lastClip = self.clips.last,
-                let clipURL = lastClip.url {
+               let lastClip = self.clips.last,
+               let clipURL = lastClip.url {
                 lastClipUrl = clipURL
             }
             return lastClipUrl
         }
     }
-    
+
     /// Adds a specific clip to a session.
     ///
     /// - Parameter clip: Clip to be added
@@ -631,7 +633,7 @@ extension NextLevelSession {
             self._totalDuration = CMTimeAdd(self._totalDuration, clip.duration)
         }
     }
-    
+
     /// Adds a specific clip to a session at the desired index.
     ///
     /// - Parameters:
@@ -643,7 +645,7 @@ extension NextLevelSession {
             self._totalDuration = CMTimeAdd(self._totalDuration, clip.duration)
         }
     }
-    
+
     /// Removes a specific clip from a session.
     ///
     /// - Parameter clip: Clip to be removed
@@ -657,7 +659,7 @@ extension NextLevelSession {
             }
         }
     }
-    
+
     /// Removes a clip from a session at the desired index.
     ///
     /// - Parameters:
@@ -668,14 +670,14 @@ extension NextLevelSession {
             if self._clips.indices.contains(idx) {
                 let clip = self._clips.remove(at: idx)
                 self._totalDuration = CMTimeSubtract(self._totalDuration, clip.duration)
-                
+
                 if removeFile {
                     clip.removeFile()
                 }
             }
         }
     }
-    
+
     /// Removes and destroys all clips for a session.
     ///
     /// - Parameter removeFiles: When true, associated files are also removed.
@@ -702,10 +704,10 @@ extension NextLevelSession {
             }
         }
     }
-    
+
     /// Completion handler type for merging clips, optionals indicate success or failure when nil
     public typealias NextLevelSessionMergeClipsCompletionHandler = (_: URL?, _: Error?) -> Void
-    
+
     /// Merges all existing recorded clips in the session and exports to a file.
     ///
     /// - Parameters:
@@ -717,18 +719,18 @@ extension NextLevelSession {
 
             let outputURL = NextLevelClip.clipURL(withFilename: filename, directoryPath: self.outputDirectory)
             var asset: AVAsset? = nil
-            
+
             if !self._clips.isEmpty {
-                
+
                 if self._clips.count == 1 {
                     debugPrint("NextLevel, warning, a merge was requested for a single clip, use lastClipUrl instead")
                 }
-                
+
                 asset = self.asset
 
                 if let exportAsset = asset, let exportURL = outputURL {
                     self.removeFile(fileUrl: exportURL)
-                    
+
                     if let exportSession = AVAssetExportSession(asset: exportAsset, presetName: preset) {
                         exportSession.shouldOptimizeForNetworkUse = true
                         exportSession.outputURL = exportURL
@@ -742,7 +744,7 @@ extension NextLevelSession {
                     }
                 }
             }
-            
+
             DispatchQueue.main.async {
                 completionHandler(nil, NextLevelError.unknown)
             }
@@ -753,21 +755,21 @@ extension NextLevelSession {
 // MARK: - composition
 
 extension NextLevelSession {
-    
+
     internal func appendClips(toComposition composition: AVMutableComposition, audioMix: AVMutableAudioMix? = nil) {
         self.executeClosureSyncOnSessionQueueIfNecessary {
             var videoTrack: AVMutableCompositionTrack? = nil
             var audioTrack: AVMutableCompositionTrack? = nil
-            
+
             var currentTime = composition.duration
-            
+
             for clip: NextLevelClip in self._clips {
                 if let asset = clip.asset {
                     let videoAssetTracks = asset.tracks(withMediaType: AVMediaType.video)
                     let audioAssetTracks = asset.tracks(withMediaType: AVMediaType.audio)
-                 
+
                     var maxRange = CMTime.invalid
-                    
+
                     var videoTime = currentTime
                     for videoAssetTrack in videoAssetTracks {
                         if videoTrack == nil {
@@ -779,29 +781,29 @@ extension NextLevelSession {
                                 videoTrack?.preferredTransform = videoAssetTrack.preferredTransform
                             }
                         }
-                        
+
                         if let foundTrack = videoTrack {
                             videoTime = self.appendTrack(track: videoAssetTrack, toCompositionTrack: foundTrack, withStartTime: videoTime, range: maxRange)
                             maxRange = videoTime
                         }
                     }
-                  
+
                     if !clip.isMutedOnMerge {
                         var audioTime = currentTime
                         for audioAssetTrack in audioAssetTracks {
-                        if audioTrack == nil {
-                            let audioTracks = composition.tracks(withMediaType: AVMediaType.audio)
-                          
-                            if audioTracks.count > 0 {
-                                audioTrack = audioTracks.first
-                            } else {
-                                audioTrack = composition.addMutableTrack(withMediaType: AVMediaType.audio, preferredTrackID: kCMPersistentTrackID_Invalid)
+                            if audioTrack == nil {
+                                let audioTracks = composition.tracks(withMediaType: AVMediaType.audio)
+
+                                if audioTracks.count > 0 {
+                                    audioTrack = audioTracks.first
+                                } else {
+                                    audioTrack = composition.addMutableTrack(withMediaType: AVMediaType.audio, preferredTrackID: kCMPersistentTrackID_Invalid)
+                                }
+                            }
+                            if let foundTrack = audioTrack {
+                                audioTime = self.appendTrack(track: audioAssetTrack, toCompositionTrack: foundTrack, withStartTime: audioTime, range: maxRange)
                             }
                         }
-                        if let foundTrack = audioTrack {
-                            audioTime = self.appendTrack(track: audioAssetTrack, toCompositionTrack: foundTrack, withStartTime: audioTime, range: maxRange)
-                        }
-                      }
                     }
 
                     currentTime = composition.duration
@@ -809,19 +811,19 @@ extension NextLevelSession {
             }
         }
     }
-    
+
     private func appendTrack(track: AVAssetTrack, toCompositionTrack compositionTrack: AVMutableCompositionTrack, withStartTime time: CMTime, range: CMTime) -> CMTime {
         var timeRange = track.timeRange
         let startTime = time + timeRange.start
-        
+
         if range.isValid {
             let currentRange = startTime + timeRange.duration
-            
+
             if currentRange > range {
                 timeRange = CMTimeRange(start: timeRange.start, duration: (timeRange.duration - (currentRange - range)))
             }
         }
-        
+
         if timeRange.duration > CMTime.zero {
             do {
                 try compositionTrack.insertTimeRange(timeRange, of: track, at: startTime)
@@ -830,16 +832,16 @@ extension NextLevelSession {
             }
             return (startTime + timeRange.duration)
         }
-        
+
         return startTime
     }
-    
+
 }
 
 // MARK: - file management
 
 extension NextLevelSession {
-    
+
     internal func nextFileURL() -> URL? {
         let filename = "\(self.identifier.uuidString)-NL-clip.\(self._clipFilenameCount).\(self.fileExtension)"
         if let url = NextLevelClip.clipURL(withFilename: filename, directoryPath: self.outputDirectory) {
@@ -849,7 +851,7 @@ extension NextLevelSession {
         }
         return nil
     }
-    
+
     internal func removeFile(fileUrl: URL) {
         if FileManager.default.fileExists(atPath: fileUrl.path) {
             do {
@@ -864,11 +866,11 @@ extension NextLevelSession {
 // MARK: - queues
 
 extension NextLevelSession {
-    
+
     internal func executeClosureAsyncOnSessionQueueIfNecessary(withClosure closure: @escaping () -> Void) {
         self._sessionQueue.async(execute: closure)
     }
-    
+
     internal func executeClosureSyncOnSessionQueueIfNecessary(withClosure closure: @escaping () -> Void) {
         if DispatchQueue.getSpecific(key: self._sessionQueueKey) != nil {
             closure()
@@ -876,5 +878,5 @@ extension NextLevelSession {
             self._sessionQueue.sync(execute: closure)
         }
     }
-    
+
 }

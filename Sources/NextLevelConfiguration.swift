@@ -232,7 +232,7 @@ public class NextLevelVideoConfiguration: NextLevelConfiguration {
     // MARK: - func
     
     /// Provides an AVFoundation friendly dictionary for configuring output.
-    ///
+    ///提供友好的一个dictionary
     /// - Parameter sampleBuffer: Sample buffer for extracting configuration information
     /// - Returns: Video configuration dictionary for AVFoundation
     public override func avcaptureSettingsDictionary(sampleBuffer: CMSampleBuffer? = nil, pixelBuffer: CVPixelBuffer? = nil) -> [String : Any]? {
@@ -243,11 +243,13 @@ public class NextLevelVideoConfiguration: NextLevelConfiguration {
         }
         
         var config: [String : Any] = [:]
-        
+        //如果自己保存了dimensions
         if let dimensions = self.dimensions {
             config[AVVideoWidthKey] = NSNumber(integerLiteral: Int(dimensions.width))
             config[AVVideoHeightKey] = NSNumber(integerLiteral: Int(dimensions.height))
         } else if let sampleBuffer = sampleBuffer,
+                  //否则的话，从sampleBuffer里面去获取
+                  //先获取Description
                   let formatDescription: CMFormatDescription = CMSampleBufferGetFormatDescription(sampleBuffer) {
 
             // TODO: this is incorrect and needs to be fixed
@@ -284,7 +286,7 @@ public class NextLevelVideoConfiguration: NextLevelConfiguration {
             config[AVVideoWidthKey] = NSNumber(integerLiteral: Int(width))
             config[AVVideoHeightKey] = NSNumber(integerLiteral: Int(height))
         }
-        
+        //更新宽高
         config = self.update(config: config)
         
         config[AVVideoCodecKey] = self.codec
@@ -293,7 +295,7 @@ public class NextLevelVideoConfiguration: NextLevelConfiguration {
         var compressionDict: [String : Any] = [:]
         compressionDict[AVVideoAverageBitRateKey] = NSNumber(integerLiteral: self.bitRate)
         compressionDict[AVVideoAllowFrameReorderingKey] = NSNumber(booleanLiteral: false)
-        compressionDict[AVVideoExpectedSourceFrameRateKey] = NSNumber(integerLiteral: 30)
+        compressionDict[AVVideoExpectedSourceFrameRateKey] = NSNumber(integerLiteral: 30) //固定30帧
         if let profileLevel = self.profileLevel {
             compressionDict[AVVideoProfileLevelKey] = profileLevel
         }

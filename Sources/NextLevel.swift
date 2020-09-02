@@ -661,13 +661,15 @@ extension NextLevel {
                 self.previewLayer.session = session
                 //根据当前的模式，对AvCaptureOutputData进行初始化
                 self.configureSession()
-                // 根据模式，对AVCaputureInputs 进行初始化
+                // 根据模式，对AVCaputureInputs 进行初始化,这里面有一些对相机的硬件本身的配置
                 self.configureSessionDevices()
+                // 初始化一些图像辅助的信息
                 self.configureMetadataObjects()
+                // 更新当前的视频转向
                 self.updateVideoOrientation()
-                
+                // 提交Configuration改变
                 self.commitConfiguration()
-                
+                //这里就开始运行了
                 if session.isRunning == false {
                     self.delegate?.nextLevelSessionWillStart(self)
                     session.startRunning()
@@ -907,6 +909,10 @@ extension NextLevel {
         self.commitConfiguration()
     }
 
+
+    ///
+    /// MetadataOutput是对metaData的一个处理
+    /// 例如一些人脸信息，人体信息，dog和cat身体信息等，这些辅助的信息
     private func configureMetadataObjects() {
         guard let session = self._captureSession else {
             return
@@ -931,6 +937,7 @@ extension NextLevel {
 
             metadataOutput.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
 
+            //过滤只支持的metadataObjectType
             let availableTypes = metadataObjectTypes.filter { type in
                 metadataOutput.availableMetadataObjectTypes.contains(type)
             }
@@ -940,7 +947,6 @@ extension NextLevel {
     }
     
     // inputs
-    
     private func configureDevice(captureDevice: AVCaptureDevice, mediaType: AVMediaType) {
         
         if let session = self._captureSession,
@@ -2539,7 +2545,11 @@ extension NextLevel {
 extension NextLevel {
     
     // sample buffer processing
-    
+    ///
+    /// 处理视频输出
+    /// - Parameters:
+    ///   - sampleBuffer:
+    ///   - session:
     internal func handleVideoOutput(sampleBuffer: CMSampleBuffer, session: NextLevelSession) {
         if session.isVideoSetup == false {
             if let settings = self.videoConfiguration.avcaptureSettingsDictionary(sampleBuffer: sampleBuffer),
@@ -2745,27 +2755,37 @@ extension NextLevel {
 // MARK: - AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate
 
 extension NextLevel: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
-    
+    ///
+    /// VideoOutput 的 delegate处理
+    /// - Parameters:
+    ///   - captureOutput:
+    ///   - sampleBuffer:
+    ///   - connection:
     public func captureOutput(_ captureOutput: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        //如果输出是当前的输出，并且没有音频
         if self.captureMode == .videoWithoutAudio && captureOutput == self._videoOutput {
             self.videoDelegate?.nextLevel(self, willProcessRawVideoSampleBuffer: sampleBuffer, onQueue: self._sessionQueue)
             self._lastVideoFrame = sampleBuffer
             if let session = self._recordingSession {
+                // 处理原始视频数据的 Output
                 self.handleVideoOutput(sampleBuffer: sampleBuffer, session: session)
             }
         } else if let videoOutput = self._videoOutput,
             let audioOutput = self._audioOutput {
+            //要判断output的是什么类型
             switch captureOutput {
             case videoOutput:
                 self.videoDelegate?.nextLevel(self, willProcessRawVideoSampleBuffer: sampleBuffer, onQueue: self._sessionQueue)
                 self._lastVideoFrame = sampleBuffer
                 if let session = self._recordingSession {
+                    //处理原始视频数据 Output
                     self.handleVideoOutput(sampleBuffer: sampleBuffer, session: session)
                 }
                 break
             case audioOutput:
                 self._lastAudioFrame = sampleBuffer
                 if let session = self._recordingSession {
+                    // 处理原始音频数据 Output
                     self.handleAudioOutput(sampleBuffer: sampleBuffer, session: session)
                 }
                 break
@@ -2972,12 +2992,11 @@ extension NextLevel {
     }
 }
 
-// MARK: - NSNotifications
+// MARK: - NSNotifications 处理一些视频的状态、设备的状态变化
 
 extension NextLevel {
     
     // application
-    
     internal func addApplicationObservers() {
         NotificationCenter.default.addObserver(self, selector: #selector(NextLevel.handleApplicationWillEnterForeground(_:)), name: UIApplication.willEnterForegroundNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(NextLevel.handleApplicationDidEnterBackground(_:)), name: UIApplication.didEnterBackgroundNotification, object: nil)
@@ -2994,6 +3013,7 @@ extension NextLevel {
     
     @objc internal func handleApplicationDidEnterBackground(_ notification: Notification) {
         self.executeClosureAsyncOnSessionQueueIfNecessary {
+            //进入后台需要暂停录制
             if self.isRecording {
                 self.pause()
             }
@@ -3003,6 +3023,7 @@ extension NextLevel {
     // session
     
     internal func addSessionObservers() {
+        //AVCaputreSession 工作模式变化时，还会发送通知！！
         NotificationCenter.default.addObserver(self, selector: #selector(NextLevel.handleSessionDidStartRunning(_:)), name: .AVCaptureSessionDidStartRunning, object: self._captureSession)
         NotificationCenter.default.addObserver(self, selector: #selector(NextLevel.handleSessionDidStopRunning(_:)), name: .AVCaptureSessionDidStopRunning, object: self._captureSession)
         NotificationCenter.default.addObserver(self, selector: #selector(NextLevel.handleSessionRuntimeError(_:)), name: .AVCaptureSessionRuntimeError, object: self._captureSession)
@@ -3091,6 +3112,7 @@ extension NextLevel {
             if let input = inputs.first,
                 let port = input.ports.first,
                 let formatDescription: CMFormatDescription = port.formatDescription {
+                //这里获取失效的Rect范围
                 let cleanAperture = CMVideoFormatDescriptionGetCleanAperture(formatDescription, originIsAtTopLeft: true)
                 self.deviceDelegate?.nextLevel(self, didChangeCleanAperture: cleanAperture)
             }
@@ -3109,7 +3131,10 @@ extension NextLevel {
 // MARK: - KVO observers
 
 extension NextLevel {
-    
+    ///
+    /// KVO 对Device一些状态进行监控
+    /// 例如，AdjustingFocus 和  isAdjustingExposure 、isAdjustingWhiteBalance、isFlashAvailable、isTorchAvailable等等相机属性
+    /// - Parameter currentDevice:
     internal func addCaptureDeviceObservers(_ currentDevice: AVCaptureDevice) {
         
         self._observers.append(currentDevice.observe(\.isAdjustingFocus, options: [.new]) { [weak self] (object, change) in
@@ -3231,7 +3256,10 @@ extension NextLevel {
             }
         })
     }
-    
+
+    ///
+    /// 移除所有的KVO监控
+    /// - Parameter currentDevice:
     internal func removeCaptureDeviceObservers(_ currentDevice: AVCaptureDevice) {
         for observer in self._observers {
             observer.invalidate()
@@ -3261,6 +3289,7 @@ extension NextLevel {
             
             if whiteBalanceMode != currentWhiteBalanceMode {
                 do {
+                    //对输入设备做任何的改变，都需要先lock才行
                     try captureDevice.lockForConfiguration()
                     
                     strongSelf.adjustWhiteBalanceForExposureMode(exposureMode: captureDevice.exposureMode)
