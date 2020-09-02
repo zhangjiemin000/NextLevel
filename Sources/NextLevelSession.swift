@@ -381,7 +381,7 @@ extension NextLevelSession {
     ///   - completionHandler: Handler when a frame appending operation completes or fails
     public func appendVideo(withSampleBuffer sampleBuffer: CMSampleBuffer, customImageBuffer: CVPixelBuffer?, minFrameDuration: CMTime, completionHandler: NextLevelSessionAppendSampleBufferCompletionHandler) {
         let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-        self.startSessionIfNecessary(timestamp: timestamp)
+        self.startSessionIfNecessary(timestamp: timestamp)  //处理时间戳
 
         var frameDuration = minFrameDuration
         let offsetBufferTimestamp = CMTimeSubtract(timestamp, self._timeOffset)
