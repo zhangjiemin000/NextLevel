@@ -37,17 +37,21 @@ extension CMSampleBuffer {
     /// - Returns: Sample buffer with the desired time offset and duration, otherwise nil.
     public class func createSampleBuffer(fromSampleBuffer sampleBuffer: CMSampleBuffer, withTimeOffset timeOffset: CMTime, duration: CMTime?) -> CMSampleBuffer? {
         var itemCount: CMItemCount = 0
+        //从CMSample中获取时间队列
         var status = CMSampleBufferGetSampleTimingInfoArray(sampleBuffer, entryCount: 0, arrayToFill: nil, entriesNeededOut: &itemCount)
+        //如果获取成功
         if status != 0 {
             return nil
         }
-        
+        //创建对应个数的timingInfo列表
         var timingInfo = [CMSampleTimingInfo](repeating: CMSampleTimingInfo(duration: CMTimeMake(value: 0, timescale: 0), presentationTimeStamp: CMTimeMake(value: 0, timescale: 0), decodeTimeStamp: CMTimeMake(value: 0, timescale: 0)), count: itemCount)
+        //对timingInfo赋值
         status = CMSampleBufferGetSampleTimingInfoArray(sampleBuffer, entryCount: itemCount, arrayToFill: &timingInfo, entriesNeededOut: &itemCount);
         if status != 0 {
             return nil
         }
-        
+        //如果存在duration，则需要对每一个timingInfo对应的参数赋值
+        //这里带上视频里的timOffset
         if let dur = duration {
             for i in 0 ..< itemCount {
                 timingInfo[i].decodeTimeStamp = CMTimeSubtract(timingInfo[i].decodeTimeStamp, timeOffset);
@@ -62,8 +66,9 @@ extension CMSampleBuffer {
         }
         
         var sampleBufferOffset: CMSampleBuffer? = nil
+        //再将新的TimingInfo赋值进去
         CMSampleBufferCreateCopyWithNewTiming(allocator: kCFAllocatorDefault, sampleBuffer: sampleBuffer, sampleTimingEntryCount: itemCount, sampleTimingArray: &timingInfo, sampleBufferOut: &sampleBufferOffset);
-        
+        //如果成功，则返回，否则的话，返回空
         if let output = sampleBufferOffset {
             return output
         } else {

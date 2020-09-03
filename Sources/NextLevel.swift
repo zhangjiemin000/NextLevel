@@ -2451,14 +2451,17 @@ extension NextLevel {
     ///
     /// - Parameter completionHandler: Completion handler for when pause completes
     public func pause(withCompletionHandler completionHandler: (() -> Void)? = nil) {
+        //当前录制暂停
         self._recording = false
         
         self.executeClosureAsyncOnSessionQueueIfNecessary {
             if let session = self._recordingSession {
                 if session.currentClipHasStarted {
                     session.endClip(completionHandler: { (sessionClip: NextLevelClip?, error: Error?) in
+                        //如果成功
                         if let sessionClip = sessionClip {
                             DispatchQueue.main.async {
+                                //这是要给一个通知
                                 self.videoDelegate?.nextLevel(self, didCompleteClip: sessionClip, inSession: session)
                             }
                             if let completionHandler = completionHandler {

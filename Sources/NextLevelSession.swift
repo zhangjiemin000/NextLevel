@@ -147,8 +147,10 @@ public class NextLevelSession {
             var asset: AVAsset? = nil
             self.executeClosureSyncOnSessionQueueIfNecessary {
                 if self._clips.count == 1 {
+                    //如果只有一个片段
                     asset = self._clips.first?.asset
                 } else {
+                    //如果有多个片段
                     let composition: AVMutableComposition = AVMutableComposition()
                     self.appendClips(toComposition: composition)
                     asset = composition
@@ -373,7 +375,7 @@ extension NextLevelSession {
     public typealias NextLevelSessionAppendSampleBufferCompletionHandler = (_: Bool) -> Void
 
     /// Append video sample buffer frames to a session for recording.
-    ///
+    /// 这个是包含音频和视频的CMBuffer
     /// - Parameters:
     ///   - sampleBuffer: Sample buffer input to be appended, unless an image buffer is also provided
     ///   - imageBuffer: Optional image buffer input for writing a custom buffer
@@ -421,23 +423,31 @@ extension NextLevelSession {
     // Beta: appendVideo(withPixelBuffer:customImageBuffer:timestamp:minFrameDuration:completionHandler:) needs to be tested
 
     /// Append video pixel buffer frames to a session for recording.
-    ///
+    /// 将Video的帧加入到文件中，视频帧的存放是通过时间戳+pixelBuffer来的
     /// - Parameters:
     ///   - sampleBuffer: Sample buffer input to be appended, unless an image buffer is also provided
     ///   - customImageBuffer: Optional image buffer input for writing a custom buffer
     ///   - minFrameDuration: Current active minimum frame duration
     ///   - completionHandler: Handler when a frame appending operation completes or fails
     public func appendVideo(withPixelBuffer pixelBuffer: CVPixelBuffer, customImageBuffer: CVPixelBuffer?, timestamp: TimeInterval, minFrameDuration: CMTime, completionHandler: NextLevelSessionAppendSampleBufferCompletionHandler) {
+        //创建时间戳
         let timestamp = CMTime(seconds: timestamp, preferredTimescale: minFrameDuration.timescale)
+        //AVAssetWriter的Session，如果需要开始，就开始
         self.startSessionIfNecessary(timestamp: timestamp)
-
+        //获取当前的duration
         var frameDuration = minFrameDuration
+        //获取两个时间戳之间的差距，正常来说，timeOffet 通常为0
         let offsetBufferTimestamp = CMTimeSubtract(timestamp, self._timeOffset)
-
+        //如果速度不是1
+        // 这里的timeScale是针对当前帧的速度，timeScale可以控制这一帧需要多长的时间，而传入的timestamp是真实的时间戳，这样，转存到文件中
+        //这个timestamp就不能直接代表帧的绝对时间了，所以，timeOffset就是起到这种作用
+        //timeOffset就是指当前时间戳与实际时间戳偏移的距离，这里就可以起到快进或者慢放的效果
         if let timeScale = self._videoConfiguration?.timescale,
            timeScale != 1.0 {
+            //这个是转换得到的最低帧速度
             let scaledDuration = CMTimeMultiplyByFloat64(minFrameDuration, multiplier: timeScale)
             if self._currentClipDuration.value > 0 {
+                //如果当前拍摄的时间不为0，则还要计算当前的真实timeOffet的
                 self._timeOffset = CMTimeAdd(self._timeOffset, CMTimeSubtract(minFrameDuration, scaledDuration))
             }
             frameDuration = scaledDuration
@@ -455,7 +465,9 @@ extension NextLevelSession {
             }
 
             if let bufferToProcess = bufferToProcess,
+               //写入文件，并标记视频时间戳，这里的时间戳是绝对时间戳
                pixelBufferAdapter.append(bufferToProcess, withPresentationTime: offsetBufferTimestamp) {
+                //视频的时长
                 self._currentClipDuration = CMTimeSubtract(CMTimeAdd(offsetBufferTimestamp, frameDuration), self._startTimestamp)
                 self._lastVideoTimestamp = timestamp
                 self._currentClipHasVideo = true
@@ -467,38 +479,40 @@ extension NextLevelSession {
     }
 
     /// Append audio sample buffer to a session for recording.
-    ///
+    /// 放入音频,实际上就是对音频的时间轴的调整，如果存在Offset的情况下
     /// - Parameters:
     ///   - sampleBuffer: Sample buffer input to be appended
     ///   - completionHandler: Handler when a frame appending operation completes or fails
     public func appendAudio(withSampleBuffer sampleBuffer: CMSampleBuffer, completionHandler: @escaping NextLevelSessionAppendSampleBufferCompletionHandler) {
+        //存放音频也是通过AVAssetWriter来写入
         self.startSessionIfNecessary(timestamp: CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
         self._audioQueue.async {
-
             var hasFailed = false
 
             let buffers = self._skippedAudioBuffers + [sampleBuffer]
             self._skippedAudioBuffers = []
             var failedBuffers: [CMSampleBuffer] = []
-
+            //遍历还未处理的所有的buf41fer
             buffers.forEach { buffer in
                 let duration = CMSampleBufferGetDuration(buffer)
+                //调整对应的音频Buffer,其实主要就是时间和duration
                 if let adjustedBuffer = CMSampleBuffer.createSampleBuffer(fromSampleBuffer: buffer, withTimeOffset: self._timeOffset, duration: duration) {
                     let presentationTimestamp = CMSampleBufferGetPresentationTimeStamp(adjustedBuffer)
                     let lastTimestamp = CMTimeAdd(presentationTimestamp, duration)
-
+                    //加入音频Buffer
                     if let audioInput = self._audioInput,
                        audioInput.isReadyForMoreMediaData,
                        audioInput.append(adjustedBuffer) {
+                        //记录上一次的时间戳
                         self._lastAudioTimestamp = lastTimestamp
-
+                        //如果当前没有Video，则需要更新Duration的参数
                         if !self.currentClipHasVideo {
                             self._currentClipDuration = CMTimeSubtract(lastTimestamp, self._startTimestamp)
                         }
 
                         self._currentClipHasAudio = true
-
                     } else {
+                        //如果失败了，就保存下来，下一次继续尝试
                         failedBuffers.append(buffer)
                         hasFailed = true
                     }
@@ -552,7 +566,7 @@ extension NextLevelSession {
     }
 
     /// Finalizes the recording of a clip.
-    ///
+    /// 将此次录制进行一个保存，并且摧毁AVAssetWriter
     /// - Parameter completionHandler: Handler for when a clip is finalized or finalization fails
     public func endClip(completionHandler: NextLevelSessionEndClipCompletionHandler?) {
         self.executeClosureSyncOnSessionQueueIfNecessary {
@@ -561,9 +575,11 @@ extension NextLevelSession {
                     self._currentClipHasStarted = false
 
                     if let writer = self._writer {
+                        //如果当前都没有音频和视频
                         if !self.currentClipHasAudio && !self.currentClipHasVideo {
+                            //结束写入文件，退出
                             writer.cancelWriting()
-
+                            // 并且删掉文件，因为没有视频，也没有音频
                             self.removeFile(fileUrl: writer.outputURL)
                             self.destroyWriter()
 
@@ -574,7 +590,9 @@ extension NextLevelSession {
                             }
                         } else {
                             //print("ending session \(CMTimeGetSeconds(self._currentClipDuration))")
+                            //结束Session
                             writer.endSession(atSourceTime: CMTimeAdd(self._currentClipDuration, self._startTimestamp))
+                            //完成写入
                             writer.finishWriting(completionHandler: {
                                 self.executeClosureSyncOnSessionQueueIfNecessary {
                                     var clip: NextLevelClip? = nil
@@ -582,12 +600,14 @@ extension NextLevelSession {
                                     let error = writer.error
 
                                     if error == nil {
+                                        //从资源文件的URL中，返回Clip的对象
                                         clip = NextLevelClip(url: url, infoDict: nil)
+                                        //将这一小片片段都加入到总的统计当中，目前，视频文件夹还是存储到临时目录中
                                         if let clip = clip {
                                             self.add(clip: clip)
                                         }
                                     }
-
+                                    //摧毁Writer
                                     self.destroyWriter()
 
                                     if let completionHandler = completionHandler {
@@ -601,7 +621,7 @@ extension NextLevelSession {
                         }
                     }
                 }
-
+                //如果没有开始录制，则直接返回错误
                 if let completionHandler = completionHandler {
                     DispatchQueue.main.async {
                         completionHandler(nil, NextLevelError.notReadyToRecord)
@@ -717,7 +737,7 @@ extension NextLevelSession {
     public typealias NextLevelSessionMergeClipsCompletionHandler = (_: URL?, _: Error?) -> Void
 
     /// Merges all existing recorded clips in the session and exports to a file.
-    ///
+    /// 合并所有的视频
     /// - Parameters:
     ///   - preset: AVAssetExportSession preset name for export
     ///   - completionHandler: Handler for when the merging process completes
@@ -734,15 +754,16 @@ extension NextLevelSession {
                     debugPrint("NextLevel, warning, a merge was requested for a single clip, use lastClipUrl instead")
                 }
 
-                asset = self.asset
+                asset = self.asset  //这里已经完全合并了所有的tracks
 
                 if let exportAsset = asset, let exportURL = outputURL {
                     self.removeFile(fileUrl: exportURL)
-
+                    //AVAssetExport Session
                     if let exportSession = AVAssetExportSession(asset: exportAsset, presetName: preset) {
                         exportSession.shouldOptimizeForNetworkUse = true
                         exportSession.outputURL = exportURL
                         exportSession.outputFileType = self.fileType
+                        //可以导出了，导出结束
                         exportSession.exportAsynchronously {
                             DispatchQueue.main.async {
                                 completionHandler(exportURL, exportSession.error)
@@ -764,27 +785,38 @@ extension NextLevelSession {
 
 extension NextLevelSession {
 
+    ///
+    /// 应该是将多个片段都赋值到AVMutableComposition这个对象里面
+    /// - Parameters:
+    ///   - composition:
+    ///   - audioMix:
     internal func appendClips(toComposition composition: AVMutableComposition, audioMix: AVMutableAudioMix? = nil) {
         self.executeClosureSyncOnSessionQueueIfNecessary {
             var videoTrack: AVMutableCompositionTrack? = nil
             var audioTrack: AVMutableCompositionTrack? = nil
 
             var currentTime = composition.duration
-
+            //遍历当前的所有Clip片段
             for clip: NextLevelClip in self._clips {
+                //获取每一个Asset对象
                 if let asset = clip.asset {
+                    //获取VideoTracks
                     let videoAssetTracks = asset.tracks(withMediaType: AVMediaType.video)
+                    //获取AudioTracks
                     let audioAssetTracks = asset.tracks(withMediaType: AVMediaType.audio)
 
                     var maxRange = CMTime.invalid
 
                     var videoTime = currentTime
+                    //先对VideoTracks操作
                     for videoAssetTrack in videoAssetTracks {
                         if videoTrack == nil {
+                            //合成器的tracks数组
                             let videoTracks = composition.tracks(withMediaType: AVMediaType.video)
                             if videoTracks.count > 0 {
                                 videoTrack = videoTracks.first
                             } else {
+                                //新建videoTrack
                                 videoTrack = composition.addMutableTrack(withMediaType: AVMediaType.video, preferredTrackID: kCMPersistentTrackID_Invalid)
                                 videoTrack?.preferredTransform = videoAssetTrack.preferredTransform
                             }
@@ -792,10 +824,12 @@ extension NextLevelSession {
 
                         if let foundTrack = videoTrack {
                             videoTime = self.appendTrack(track: videoAssetTrack, toCompositionTrack: foundTrack, withStartTime: videoTime, range: maxRange)
+                            //增加VideoTime
                             maxRange = videoTime
                         }
                     }
 
+                    //如果没有静音
                     if !clip.isMutedOnMerge {
                         var audioTime = currentTime
                         for audioAssetTrack in audioAssetTracks {
@@ -809,6 +843,7 @@ extension NextLevelSession {
                                 }
                             }
                             if let foundTrack = audioTrack {
+                                //这里的音轨，也是顺序的输入
                                 audioTime = self.appendTrack(track: audioAssetTrack, toCompositionTrack: foundTrack, withStartTime: audioTime, range: maxRange)
                             }
                         }
@@ -820,24 +855,37 @@ extension NextLevelSession {
         }
     }
 
+    ///
+    /// 增加AVAssetTrack
+    /// - Parameters:
+    ///   - track:
+    ///   - compositionTrack:
+    ///   - time:
+    ///   - range:
+    /// - Returns:
     private func appendTrack(track: AVAssetTrack, toCompositionTrack compositionTrack: AVMutableCompositionTrack, withStartTime time: CMTime, range: CMTime) -> CMTime {
+        //这里的track是真的有数据的视频
         var timeRange = track.timeRange
+        //当前的startTime
         let startTime = time + timeRange.start
 
         if range.isValid {
+            //如果range是有效的,需要更新range，这个range参数是上一次的视频Range
             let currentRange = startTime + timeRange.duration
-
+            //如果CurrentRange更新后，是在上一个时间轴之后，需要个恒信timeRange，这个timeRange就是以timeRage.start为起点，长度为
             if currentRange > range {
                 timeRange = CMTimeRange(start: timeRange.start, duration: (timeRange.duration - (currentRange - range)))
             }
         }
-
+        //如果实际存在的Range Duration 大于0
         if timeRange.duration > CMTime.zero {
             do {
+                //加入compititionTrack中
                 try compositionTrack.insertTimeRange(timeRange, of: track, at: startTime)
             } catch {
                 print("NextLevel, failed to insert composition track")
             }
+            //返回当前的时间
             return (startTime + timeRange.duration)
         }
 

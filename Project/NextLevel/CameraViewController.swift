@@ -237,7 +237,10 @@ class CameraViewController: UIViewController {
 // MARK: - library
 
 extension CameraViewController {
-    
+    ///
+    /// 获取相册的方法
+    /// - Parameter title:
+    /// - Returns:
     internal func albumAssetCollection(withTitle title: String) -> PHAssetCollection? {
         let predicate = NSPredicate(format: "localizedTitle = %@", title)
         let options = PHFetchOptions()
@@ -255,7 +258,7 @@ extension CameraViewController {
 // MARK: - capture
 
 extension CameraViewController {
-    
+    //开始进行录制
     internal func startCapture() {
         self.photoTapGestureRecognizer?.isEnabled = false
         UIView.animate(withDuration: 0.15, delay: 0, options: .curveEaseInOut, animations: {
@@ -277,10 +280,13 @@ extension CameraViewController {
         self.photoTapGestureRecognizer?.isEnabled = true
         
         if let session = NextLevel.shared.session {
-            
+            //NextLevelSession 里面管理了本次录制期间的所有视频片段
             if session.clips.count > 1 {
+                //如果视频片段大于1，则需要合并
                 session.mergeClips(usingPreset: AVAssetExportPresetHighestQuality, completionHandler: { (url: URL?, error: Error?) in
+                    //这里证明已经导出结束了， 对应的URL就是文件存放的位置
                     if let url = url {
+                        //这里再把这个视频插入到用户相册当中
                         self.saveVideo(withURL: url)
                     } else if let _ = error {
                         print("failed to merge clips at the end of capture \(String(describing: error))")
@@ -340,10 +346,14 @@ extension CameraViewController {
 // MARK: - media utilities
 
 extension CameraViewController {
-    
+
+    ///
+    /// 将视频插入到相册当中
+    /// - Parameter url:
     internal func saveVideo(withURL url: URL) {
+        //PhotoLibrary 执行插入
         PHPhotoLibrary.shared().performChanges({
-            //获取album Collection
+            //获取album Collection，获取Album并不会调用completionHandler
             let albumAssetCollection = self.albumAssetCollection(withTitle: NextLevelAlbumTitle)
             if albumAssetCollection == nil {
                 //如果没有，则创建这个相册
@@ -353,13 +363,17 @@ extension CameraViewController {
                 //获取相册已经结束
                 if let albumAssetCollection = self.albumAssetCollection(withTitle: NextLevelAlbumTitle) {
                     PHPhotoLibrary.shared().performChanges({
+                        //先调用PerformChanges
+                        //再在PerformChanges里面初始化Request
+                        //对应Collection与Asset都有各自的Request
+                        //创建对应的资源，都是通过placeholderForCreatedAsset。
                         //创建change request， 这个是Asset change Request
                         if let assetChangeRequest = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url) {
                             // 这里是对collection 来change request
                             let assetCollectionChangeRequest = PHAssetCollectionChangeRequest(for: albumAssetCollection)
                             // 创建资源(都要创建placeHolder)
                             let enumeration: NSArray = [assetChangeRequest.placeholderForCreatedAsset!]
-                            //保存资源
+                            //保存资源，对应的相册的Request，加入AssetChangeRequest
                             assetCollectionChangeRequest?.addAssets(enumeration)
                         }
                     }, completionHandler: { (success2: Bool, error2: Error?) in
