@@ -180,6 +180,7 @@ public class NextLevelSession {
     ///video input 是对资源的写入对象
     internal var _videoInput: AVAssetWriterInput?
     internal var _audioInput: AVAssetWriterInput?
+    //相对于Audio，VideoBuffer可以用BufferAdpter中转一下，这样更加有效率，并且Adaptor类似于一个缓冲池
     internal var _pixelBufferAdapter: AVAssetWriterInputPixelBufferAdaptor?
 
     internal var _videoConfiguration: NextLevelVideoConfiguration?
