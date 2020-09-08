@@ -2318,13 +2318,14 @@ extension NextLevel {
             }
             
             var buffer: CVPixelBuffer? = nil
+            //获取最后一帧画面
             if let videoFrame = self._lastVideoFrame,
                 let imageBuffer = CMSampleBufferGetImageBuffer(videoFrame) {
                 buffer = imageBuffer
             } else if let arFrame = self._lastARFrame {
                 buffer = arFrame
             }
-            
+            //如果需要自己处理,就传出去自己处理
             if self.isVideoCustomContextRenderingEnabled {
                 if let buffer = buffer {
                     if CVPixelBufferLockBaseAddress(buffer, CVPixelBufferLockFlags(rawValue: 0)) == kCVReturnSuccess {
@@ -2336,13 +2337,13 @@ extension NextLevel {
             }
             
             var photoDict: [String: Any]? = nil
+            //配置的比例（纵横比）
             let ratio = self.videoConfiguration.aspectRatio.ratio
+            //如果存在经过处理的ImageBuffer
             if let customFrame = self._sessionVideoCustomContextImageBuffer {
-            
                 // TODO append exif metadata
                 
                 // add JPEG, thumbnail
-                
                 if let photo = self.sharedCIContext?.uiimage(withPixelBuffer: customFrame) {
                     let croppedPhoto = ratio != nil ? photo.nx_croppedImage(to: ratio!) : photo
                     if let imageData = photo.jpegData(compressionQuality: 1),
@@ -2356,7 +2357,7 @@ extension NextLevel {
                 }
                 
             } else if let videoFrame = self._lastVideoFrame {
-                
+                //如果没有自己的渲染过程
                 // append exif metadata
                 videoFrame.append(metadataAdditions: NextLevel.tiffMetadata())
                 if let metadata = videoFrame.metadata() {
@@ -2367,6 +2368,7 @@ extension NextLevel {
                 }
                 
                 // add JPEG, thumbnail
+                //CIContext -----> sampleBuffer <-> UIImage
                 if let photo = self.sharedCIContext?.uiimage(withSampleBuffer: videoFrame) {
                     let croppedPhoto = ratio != nil ? photo.nx_croppedImage(to: ratio!) : photo
                     if let imageData = photo.jpegData(compressionQuality: 1),
@@ -2509,9 +2511,10 @@ extension NextLevel {
     }
     
     /// Triggers a photo capture.
+    /// 拍摄照片
     public func capturePhoto() {
-        if let photoOutput = self._photoOutput,
-            let _ = photoOutput.connection(with: AVMediaType.video) {
+        if let photoOutput = self._photoOutput,  //想要拍照，必须有PhotoOutput
+            let _ = photoOutput.connection(with: AVMediaType.video) {  //如果已经连接上
             if let formatDictionary = self.photoConfiguration.avcaptureDictionary() {
                 
                 let photoSettings = AVCapturePhotoSettings(format: formatDictionary)
@@ -2825,20 +2828,37 @@ extension NextLevel: AVCaptureFileOutputRecordingDelegate {
 // MARK: - AVCapturePhotoCaptureDelegate
 
 extension NextLevel: AVCapturePhotoCaptureDelegate {
-    
+
+    ///
+    /// 已经解析完毕PhotoOutputSettings， 将要进行拍摄
+    /// - Parameters:
+    ///   - captureOutput:
+    ///   - resolvedSettings:
     public func photoOutput(_ captureOutput: AVCapturePhotoOutput, willCapturePhotoFor resolvedSettings: AVCaptureResolvedPhotoSettings) {
         DispatchQueue.main.async {
             self.photoDelegate?.nextLevel(self, willCapturePhotoWithConfiguration: self.photoConfiguration)
         }
     }
-    
+    ///
+    /// 已经解析完毕PhototOutputSettings，已经完成拍摄
+    /// - Parameters:
+    ///   - output:
+    ///   - resolvedSettings:
     public func photoOutput(_ output: AVCapturePhotoOutput, didCapturePhotoFor resolvedSettings: AVCaptureResolvedPhotoSettings) {
         DispatchQueue.main.async {
             self.photoDelegate?.nextLevel(self, didCapturePhotoWithConfiguration: self.photoConfiguration)
         }
     }
     
-    
+    ///
+    /// 已经完成处理
+    /// - Parameters:
+    ///   - captureOutput:
+    ///   - photoSampleBuffer:
+    ///   - previewPhotoSampleBuffer:
+    ///   - resolvedSettings:
+    ///   - bracketSettings:
+    ///   - error:
     public func photoOutput(_ captureOutput: AVCapturePhotoOutput, didFinishProcessingPhoto photoSampleBuffer: CMSampleBuffer?, previewPhoto previewPhotoSampleBuffer: CMSampleBuffer?, resolvedSettings: AVCaptureResolvedPhotoSettings, bracketSettings: AVCaptureBracketedStillImageSettings?, error: Error?) {
         if let sampleBuffer = photoSampleBuffer {
             
@@ -2870,7 +2890,16 @@ extension NextLevel: AVCapturePhotoCaptureDelegate {
             }
         }
     }
-    
+
+    ///
+    /// 已经完成原始图片处理
+    /// - Parameters:
+    ///   - captureOutput:
+    ///   - rawSampleBuffer:
+    ///   - previewPhotoSampleBuffer:
+    ///   - resolvedSettings:
+    ///   - bracketSettings:
+    ///   - error:
     public func photoOutput(_ captureOutput: AVCapturePhotoOutput, didFinishProcessingRawPhoto rawSampleBuffer: CMSampleBuffer?, previewPhoto previewPhotoSampleBuffer: CMSampleBuffer?, resolvedSettings: AVCaptureResolvedPhotoSettings, bracketSettings: AVCaptureBracketedStillImageSettings?, error: Error?) {
         if let sampleBuffer = rawSampleBuffer {
             
@@ -2903,19 +2932,31 @@ extension NextLevel: AVCapturePhotoCaptureDelegate {
             }
         }
     }
-    
+
+    ///
+    /// 已经完成图片的捕获
+    /// - Parameters:
+    ///   - captureOutput:
+    ///   - resolvedSettings:
+    ///   - error:
     public func photoOutput(_ captureOutput: AVCapturePhotoOutput, didFinishCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings, error: Error?) {
         DispatchQueue.main.async {
             self.photoDelegate?.nextLevelDidCompletePhotoCapture(self)
         }
     }
-    
+
+    ///
+    /// 11 系统以后，完成图片的通知，这个回调里面有一些深度信息和人像蒙版信息
+    /// - Parameters:
+    ///   - output:
+    ///   - photo:
+    ///   - error:
     @available(iOS 11.0, *)
     public func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         DispatchQueue.main.async {
             self.photoDelegate?.nextLevel(self, didFinishProcessingPhoto: photo)
         }
-        
+        //12以上才有人像信息
         if #available(iOS 12.0, *){
             if let portraitEffectsMatte = photo.portraitEffectsMatte {
                 DispatchQueue.main.async {
@@ -2928,7 +2969,8 @@ extension NextLevel: AVCapturePhotoCaptureDelegate {
 }
 
 // MARK: - AVCaptureDepthDataOutputDelegate
-
+///
+/// 深度信息
 #if USE_TRUE_DEPTH
 @available(iOS 11.0, *)
 extension NextLevel: AVCaptureDepthDataOutputDelegate {
@@ -2973,7 +3015,8 @@ extension NextLevel {
 #endif
 
 // MARK: - AVCaptureMetadataOutputObjectsDelegate
-
+///
+/// 这个是MetaData的输出代理，metaData就是一些关键信息的输出
 extension NextLevel: AVCaptureMetadataOutputObjectsDelegate {
 
     public func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
@@ -2991,7 +3034,10 @@ extension NextLevel: AVCaptureMetadataOutputObjectsDelegate {
 // MARK: - queues
 
 extension NextLevel {
-    
+
+    ///
+    /// 这个只起到了扔到全局线程的一个作用，用来避免在主线程操作Closure里面的这些事情
+    /// - Parameter closure:
     internal func executeClosureAsyncOnSessionQueueIfNecessary(withClosure closure: @escaping () -> Void) {
         self._sessionQueue.async(execute: closure)
     }

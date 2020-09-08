@@ -39,8 +39,9 @@ extension UIImage {
                                           y: bound.origin.y * self.scale,
                                           width: bound.width * self.scale,
                                           height: bound.height * self.scale)
+        //裁剪图片
         let imageRef = self.cgImage?.cropping(to: scaledBounds)
-        
+        //生成新的裁剪图片
         let croppedImage: UIImage = UIImage(cgImage: imageRef!, scale: self.scale, orientation: UIImage.Orientation.up)
         return croppedImage
     }

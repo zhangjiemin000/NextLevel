@@ -104,7 +104,10 @@ class CameraViewController: UIViewController {
             longPressGestureRecognizer.minimumPressDuration = 0.05
             longPressGestureRecognizer.allowableMovement = 10.0
             recordButton.addGestureRecognizer(longPressGestureRecognizer)
+            recordButton.addGestureRecognizer(UITapGestureRecognizer.init(target: self, action: #selector(handlePhotoTapGestureRecognizer(_:))))
         }
+
+
         
         self.flipButton = UIButton(type: .custom)
         if let flipButton = self.flipButton {
@@ -394,7 +397,10 @@ extension CameraViewController {
             }
         })
     }
-    
+
+    ///
+    /// 保存图片到相册中
+    /// - Parameter photoImage:
     internal func savePhoto(photoImage: UIImage) {
         let NextLevelAlbumTitle = "NextLevel"
         
@@ -482,7 +488,7 @@ extension CameraViewController: UIGestureRecognizerDelegate {
 
 extension CameraViewController {
 
-    internal func handlePhotoTapGestureRecognizer(_ gestureRecognizer: UIGestureRecognizer) {
+    @objc internal func handlePhotoTapGestureRecognizer(_ gestureRecognizer: UIGestureRecognizer) {
         // play system camera shutter sound
         AudioServicesPlaySystemSoundWithCompletion(SystemSoundID(1108), nil)
         NextLevel.shared.capturePhotoFromVideo()
