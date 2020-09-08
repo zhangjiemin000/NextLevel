@@ -424,7 +424,7 @@ public class NextLevelPhotoConfiguration : NextLevelConfiguration {
     public var generateThumbnail: Bool = false
 
     /// Enabled high resolution capture
-    public var isHighResolutionEnabled: Bool = false
+    public var isHighResolutionEnabled: Bool = true
     
     /// Enabled depth data capture with photo
     #if USE_TRUE_DEPTH

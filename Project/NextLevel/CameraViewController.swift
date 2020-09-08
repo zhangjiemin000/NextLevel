@@ -103,7 +103,7 @@ class CameraViewController: UIViewController {
             longPressGestureRecognizer.delegate = self
             longPressGestureRecognizer.minimumPressDuration = 0.05
             longPressGestureRecognizer.allowableMovement = 10.0
-            recordButton.addGestureRecognizer(longPressGestureRecognizer)
+//            recordButton.addGestureRecognizer(longPressGestureRecognizer)
             recordButton.addGestureRecognizer(UITapGestureRecognizer.init(target: self, action: #selector(handlePhotoTapGestureRecognizer(_:))))
         }
 
@@ -491,7 +491,10 @@ extension CameraViewController {
     @objc internal func handlePhotoTapGestureRecognizer(_ gestureRecognizer: UIGestureRecognizer) {
         // play system camera shutter sound
         AudioServicesPlaySystemSoundWithCompletion(SystemSoundID(1108), nil)
-        NextLevel.shared.capturePhotoFromVideo()
+//        NextLevel.shared.capturePhotoFromVideo()
+        if(NextLevel.shared.canCapturePhoto){
+            NextLevel.shared.capturePhoto()
+        }
     }
     
     @objc internal func handleFocusTapGestureRecognizer(_ gestureRecognizer: UIGestureRecognizer) {
@@ -774,6 +777,41 @@ extension CameraViewController: NextLevelPhotoDelegate {
     
     @available(iOS 11.0, *)
     func nextLevel(_ nextLevel: NextLevel, didFinishProcessingPhoto photo: AVCapturePhoto) {
+        //如果是压缩类型的图片
+        if let cgImage = photo.cgImageRepresentation()?.takeRetainedValue() {
+            let image = UIImage.init(cgImage: cgImage,scale:UIScreen.main.scale,orientation: .up)
+
+            PHPhotoLibrary.shared().performChanges({
+                if let alumb = self.albumAssetCollection(withTitle: NextLevelAlbumTitle) {
+                    //如果存在这个相册，就不用管了
+                } else {
+                    //如果不存在
+                    let alumbRequest = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: NextLevelAlbumTitle)
+                    //创建了一个相册
+                    alumbRequest.placeholderForCreatedAssetCollection
+                }
+            }, completionHandler: { b, error in
+                //如果创建成功
+                if (b) {
+                    if let alumb = self.albumAssetCollection(withTitle: NextLevelAlbumTitle) {
+                        PHPhotoLibrary.shared().performChanges({
+                            //现在就要插入图片了
+                            let imageAssetRequest = PHAssetChangeRequest.creationRequestForAsset(from: image)
+                            let alumbRequest = PHAssetCollectionChangeRequest(for: alumb)
+                            let array: NSArray = [imageAssetRequest.placeholderForCreatedAsset!]
+                            //一次性加入
+                            alumbRequest?.addAssets(array)
+                        }, completionHandler: { b, error in
+                            if(!b) {
+                                print(error?.localizedDescription)
+                            }
+                        })
+                    }
+                } else {
+                    //如果创建失败
+                }
+            })
+        }
     }
     
 }
