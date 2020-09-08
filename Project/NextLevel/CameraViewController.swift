@@ -778,9 +778,8 @@ extension CameraViewController: NextLevelPhotoDelegate {
     @available(iOS 11.0, *)
     func nextLevel(_ nextLevel: NextLevel, didFinishProcessingPhoto photo: AVCapturePhoto) {
         //如果是压缩类型的图片
-        if let cgImage = photo.cgImageRepresentation()?.takeRetainedValue() {
-            let image = UIImage.init(cgImage: cgImage,scale:UIScreen.main.scale,orientation: .up)
-
+        if let data = photo.fileDataRepresentation(),
+           let image = UIImage.init(data: data) {
             PHPhotoLibrary.shared().performChanges({
                 if let alumb = self.albumAssetCollection(withTitle: NextLevelAlbumTitle) {
                     //如果存在这个相册，就不用管了
