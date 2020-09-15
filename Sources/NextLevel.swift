@@ -1559,8 +1559,7 @@ extension NextLevel {
     }
 }
 
-// MARK: - focus, exposure, white balance
-
+// MARK: - focus, exposure, white balance 聚焦、曝光、白平衡,相机的参数调整
 extension NextLevel {
 
     // focus, exposure, and white balance
@@ -1586,7 +1585,7 @@ extension NextLevel {
         }
     }
 
-    /// Checks if focus adjustment is in progress.
+    /// Checks if focus adjustment is in progress.  自适应聚焦过程中
     public var isAdjustingFocus: Bool {
         get {
             if let device = self._currentDevice {
@@ -1596,7 +1595,7 @@ extension NextLevel {
         }
     }
 
-    /// The focus mode of the device.
+    /// The focus mode of the device.  聚焦模式
     public var focusMode: NextLevelFocusMode {
         get {
             if let device = self._currentDevice {
@@ -1624,7 +1623,7 @@ extension NextLevel {
         }
     }
 
-    /// The lens position of the device.
+    /// The lens position of the device. 焦距
     public var lensPosition: Float {
         get {
             if let device = self._currentDevice {
@@ -1772,7 +1771,7 @@ extension NextLevel {
     }
 
     /// Changes exposure at adjusted point of interest.
-    ///
+    /// 是否支持对关键点曝光聚焦
     /// - Parameter adjustedPoint: The point of interest for exposure.
     public func exposeAtAdjustedPointOfInterest(adjustedPoint: CGPoint) {
         guard let device = self._currentDevice,
