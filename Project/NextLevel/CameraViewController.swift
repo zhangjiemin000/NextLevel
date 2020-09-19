@@ -103,8 +103,8 @@ class CameraViewController: UIViewController {
             longPressGestureRecognizer.delegate = self
             longPressGestureRecognizer.minimumPressDuration = 0.05
             longPressGestureRecognizer.allowableMovement = 10.0
-//            recordButton.addGestureRecognizer(longPressGestureRecognizer)
-            recordButton.addGestureRecognizer(UITapGestureRecognizer.init(target: self, action: #selector(handlePhotoTapGestureRecognizer(_:))))
+            recordButton.addGestureRecognizer(longPressGestureRecognizer)
+//            recordButton.addGestureRecognizer(UITapGestureRecognizer.init(target: self, action: #selector(handlePhotoTapGestureRecognizer(_:))))
         }
 
 

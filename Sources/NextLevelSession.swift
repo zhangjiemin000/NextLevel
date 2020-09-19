@@ -188,6 +188,7 @@ public class NextLevelSession {
 
     internal var _audioQueue: DispatchQueue
     internal var _sessionQueue: DispatchQueue
+    //这个是自动设置的Key值
     internal var _sessionQueueKey: DispatchSpecificKey<()>
 
     internal var _currentClipDuration: CMTime = .zero
@@ -857,10 +858,10 @@ extension NextLevelSession {
     }
 
     ///
-    /// 增加AVAssetTrack
+    /// 更新AssetTrack的时间
     /// - Parameters:
-    ///   - track:
-    ///   - compositionTrack:
+    ///   - track: 当前AssetTrack的第一个Video
+    ///   - compositionTrack:  需要合并的一个Track
     ///   - time:
     ///   - range:
     /// - Returns:
@@ -869,7 +870,7 @@ extension NextLevelSession {
         var timeRange = track.timeRange
         //当前的startTime
         let startTime = time + timeRange.start
-
+        //第一次进来，肯定是没有Valid
         if range.isValid {
             //如果range是有效的,需要更新range，这个range参数是上一次的视频Range
             let currentRange = startTime + timeRange.duration
@@ -882,6 +883,7 @@ extension NextLevelSession {
         if timeRange.duration > CMTime.zero {
             do {
                 //加入compititionTrack中
+                //加入到合并Track中，timeRange就是时间段
                 try compositionTrack.insertTimeRange(timeRange, of: track, at: startTime)
             } catch {
                 print("NextLevel, failed to insert composition track")

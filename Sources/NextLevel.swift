@@ -283,7 +283,7 @@ public class NextLevel: NSObject {
     // camera configuration
 
     /// The current capture mode of the device.
-    public var captureMode: NextLevelCaptureMode = .photo {
+    public var captureMode: NextLevelCaptureMode = .videoWithoutAudio {
         didSet {
             guard
                     self.captureMode != oldValue
@@ -1069,7 +1069,7 @@ extension NextLevel {
                     videoSettings[String(kCVPixelBufferPixelFormatTypeKey)] = Int(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
                 }
             }
-            //主要指定这些格式
+            //主要指定这些格式,指定最终的像素格式
             self._videoOutput?.videoSettings = videoSettings
         }
 
